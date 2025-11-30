@@ -102,11 +102,15 @@ exports.loginUser = async (req, res) => {
 
 // LOGOUT
 exports.logout = (req, res) => {
-  res.clearCookie("token").json({
+  res.clearCookie("token", {
+    httpOnly: true,
+    secure: true,
+    sameSite: "none",
+  }).json({
     success: true,
     message: "Logout successfully!",
   });
-};
+};;
 
 // AUTH MIDDLEWARE
 exports.authMiddleware = async (req, res, next) => {
@@ -119,7 +123,8 @@ exports.authMiddleware = async (req, res, next) => {
   }
 
   try {
-    const decode = jwt.verify(token, "CLIENT_SECRET_KEY");
+    const decode = jwt.verify(token, process.env.CLIENT_SECRET_KEY);
+
     req.user = decode;
     next();
   } catch (error) {
