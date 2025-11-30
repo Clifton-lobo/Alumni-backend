@@ -70,14 +70,16 @@ exports.loginUser = async (req, res) => {
         email: checkUser.email,
         username: checkUser.username,
       },
-      "CLIENT_SECRET_KEY",
+      process.env.CLIENT_SECRET_KEY, // use env variable
       { expiresIn: "1d" }
     );
 
     res
       .cookie("token", token, {
         httpOnly: true,
-        secure: false,
+        secure: true, // 🚀 Required on HTTPS / Render
+        sameSite: "none", // 🚀 Required for cross-site cookies
+        maxAge: 24 * 60 * 60 * 1000,
       })
       .json({
         success: true,
