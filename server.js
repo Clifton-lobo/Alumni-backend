@@ -6,7 +6,7 @@ const dotenv = require("dotenv");
 const authRoutes = require("./routes/authRoutes/authRoutes");
 const AdminEventRoutes = require("./routes/adminRoutes/AdminEventRoutes");
 
-dotenv.config(); // <-- 👈 important if your .env is inside backend folder
+dotenv.config(); 
 
 
 const app = express();
@@ -22,9 +22,7 @@ mongoose
 // Middleware
 app.use(
   cors({
-    origin: [
-      "http://localhost:5173",
-      "http://192.168.0.107:5173"],
+    origin: "http://localhost:5173",
     methods: ["GET", "POST", "DELETE", "PUT"],
     allowedHeaders: [
       "Content-Type",
@@ -46,6 +44,6 @@ app.use("/api/admin/events", AdminEventRoutes);
 
 // Server Start
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, "0.0.0.0", () => {
+app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
 });
