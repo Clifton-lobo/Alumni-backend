@@ -6,23 +6,18 @@ const dotenv = require("dotenv");
 const authRoutes = require("./routes/authRoutes/authRoutes");
 const AdminEventRoutes = require("./routes/adminRoutes/AdminEventRoutes");
 
-dotenv.config(); 
-
+dotenv.config();
 
 const app = express();
 
-// MongoDB Connection
 mongoose
-  .connect(
-    "mongodb+srv://useralumni:passalumni@clusteralumni.sek1p83.mongodb.net/?retryWrites=true&w=majority&appName=ClusterAlumni"
-  )
+  .connect(process.env.MONGO_URI)
   .then(() => console.log("✅ MongoDB Connected"))
   .catch((err) => console.error("❌ MongoDB Connection Error:", err));
 
-// Middleware
 app.use(
   cors({
-    origin: "http://localhost:5173",
+    origin: process.env.CLIENT_URL,
     methods: ["GET", "POST", "DELETE", "PUT"],
     allowedHeaders: [
       "Content-Type",
@@ -38,12 +33,9 @@ app.use(
 app.use(cookieParser());
 app.use(express.json());
 
-// Routes
+
 app.use("/api/auth", authRoutes);
 app.use("/api/admin/events", AdminEventRoutes);
 
-// Server Start
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => {
-  console.log(`🚀 Server running on port ${PORT}`);
-});
+app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
