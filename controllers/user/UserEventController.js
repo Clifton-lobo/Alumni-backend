@@ -1,5 +1,6 @@
 const Event = require("../../models/Event.model.js");
 
+
 const getFilteredEvents = async (req, res) => {
   try {
     console.log("📥 Filter request received:", req.query);
@@ -9,41 +10,48 @@ const getFilteredEvents = async (req, res) => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    // 👉 Default: return all events
     let query = {};
 
+    // 🔍 Search by title (case-insensitive)
     if (search && search.trim() !== "") {
       query.title = { $regex: search, $options: "i" };
     }
 
+    // 📅 Apply date filters ONLY when required
+    const dateQuery = {};
+
     if (filter === "next7") {
       const next7 = new Date(today);
       next7.setDate(today.getDate() + 7);
-      query.date = { $gte: today, $lte: next7 };
+      dateQuery.$gte = today;
+      dateQuery.$lte = next7;
     }
 
     if (filter === "next30") {
       const next30 = new Date(today);
       next30.setDate(today.getDate() + 30);
-      query.date = { $gte: today, $lte: next30 };
+      dateQuery.$gte = today;
+      dateQuery.$lte = next30;
     }
 
     if (filter === "next60") {
       const next60 = new Date(today);
       next60.setDate(today.getDate() + 60);
-      query.date = { $gte: today, $lte: next60 };
+      dateQuery.$gte = today;
+      dateQuery.$lte = next60;
     }
 
     if (filter === "custom" && startDate && endDate) {
-      query.date = {
-        $gte: new Date(startDate),
-        $lte: new Date(endDate),
-      };
+      dateQuery.$gte = new Date(startDate);
+      dateQuery.$lte = new Date(endDate);
     }
 
-    // 📌 Important: Make sure "all" doesn't override the main query variable
-    query = {}; // keep everything
-    console.log("Query sending =>", query);
+    // ➕ If date filter exists, merge into main query
+    if (Object.keys(dateQuery).length > 0) {
+      query.date = dateQuery;
+    }
+
+    console.log("🔍 Final Query =>", query);
 
     const events = await Event.find(query).sort({ date: 1 });
 
