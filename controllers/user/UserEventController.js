@@ -7,6 +7,10 @@ const getFilteredEvents = async (req, res) => {
 
     const { filter, startDate, endDate, search } = req.query;
 
+    let page = parseInt(req.query.page) || 1;
+    let limit = parseInt(req.query.limit) || 15;
+    let skip = (page-1) * limit;
+
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
@@ -51,15 +55,23 @@ const getFilteredEvents = async (req, res) => {
       query.date = dateQuery;
     }
 
+    const totalEvents = await Event.countDocuments(query);
+
     console.log("🔍 Final Query =>", query);
 
-    const events = await Event.find(query).sort({ date: 1 });
+    const events = await Event.find(query)
+    .sort({ date: 1 })
+    .skip(skip)
+    .limit(limit);
 
     console.log("Found events:", events.length);
 
     return res.status(200).json({
       success: true,
       events,
+      currentPage : page,
+      totalPages : Math.ceil(totalEvents/limit),
+      totalEvents,
     });
   } catch (err) {
     console.log("❌ Error:", err);
