@@ -1,5 +1,6 @@
 const { handleImageUploadUtil } = require("../../helpers/Cloudinary");
 const Event = require("../../models/Event.model");
+const EventRegistration = require("../../models/RegisterEvent");
 
 // Upload image to Cloudinary
 exports.handleImageUpload = async (req, res) => {
@@ -29,11 +30,35 @@ exports.handleImageUpload = async (req, res) => {
   }
 };
 
-// Add a new event
+// ✅ Add a new event (UPDATED)
 exports.addEvent = async (req, res) => {
   try {
-    const { image, title, date, time, category, status, description } =
-      req.body;
+    const {
+      image,
+      title,
+      date,
+      time,
+      category,
+      status,
+      description,
+      isVirtual,
+      address,
+    } = req.body;
+
+    // 🔒 Validation
+    if (!title || !date || !time || !category || !description) {
+      return res.status(400).json({
+        success: false,
+        message: "Missing required fields",
+      });
+    }
+
+    if (isVirtual === false && !address) {
+      return res.status(400).json({
+        success: false,
+        message: "Address is required for physical events",
+      });
+    }
 
     const newEvent = new Event({
       image,
@@ -43,6 +68,8 @@ exports.addEvent = async (req, res) => {
       category,
       status,
       description,
+      isVirtual,
+      address: isVirtual ? undefined : address,
     });
 
     await newEvent.save();
@@ -52,7 +79,7 @@ exports.addEvent = async (req, res) => {
       data: newEvent,
     });
   } catch (err) {
-    console.log(err);
+    console.error(err);
     res.status(500).json({
       message: "Error occurred while adding event",
       success: false,
@@ -63,52 +90,74 @@ exports.addEvent = async (req, res) => {
 // Fetch all events
 exports.fetchEvent = async (req, res) => {
   try {
-    const listOfEvents = await Event.find({});
+    const listOfEvents = await Event.find({}).sort({ date: 1 });
+
     res.status(200).json({
       success: true,
       data: listOfEvents,
     });
   } catch (err) {
-    console.log(err);
+    console.error(err);
     res.status(500).json({
       message: "Error occurred while fetching events",
       success: false,
-      error: error.message,
     });
   }
 };
 
-// Update event
+// ✅ Update event (UPDATED)
 exports.updateEvent = async (req, res) => {
   try {
     const { id } = req.params;
-    const { image, title, date, time, category, status, description } =
-      req.body;
+    const {
+      image,
+      title,
+      date,
+      time,
+      category,
+      status,
+      description,
+      isVirtual,
+      address,
+    } = req.body;
 
-    const findEvent = await Event.findById(id);
-    if (!findEvent) {
+    const event = await Event.findById(id);
+    if (!event) {
       return res.status(404).json({
         success: false,
         message: "Event not found",
       });
     }
 
-    findEvent.image = image || findEvent.image;
-    findEvent.title = title || findEvent.title;
-    findEvent.date = date || findEvent.date;
-    findEvent.time = time || findEvent.time;
-    findEvent.category = category || findEvent.category;
-    findEvent.status = status || findEvent.status;
-    findEvent.description = description || findEvent.description;
+    // 🔒 Conditional validation
+    if (isVirtual === false && !address) {
+      return res.status(400).json({
+        success: false,
+        message: "Address is required for physical events",
+      });
+    }
 
-    await findEvent.save();
+    event.image = image ?? event.image;
+    event.title = title ?? event.title;
+    event.date = date ?? event.date;
+    event.time = time ?? event.time;
+    event.category = category ?? event.category;
+    event.status = status ?? event.status;
+    event.description = description ?? event.description;
+
+    if (typeof isVirtual === "boolean") {
+      event.isVirtual = isVirtual;
+      event.address = isVirtual ? undefined : address;
+    }
+
+    await event.save();
 
     res.status(200).json({
       success: true,
-      data: findEvent,
+      data: event,
     });
   } catch (err) {
-    console.log(err);
+    console.error(err);
     res.status(500).json({
       message: "Error occurred while updating event",
       success: false,
@@ -120,8 +169,8 @@ exports.updateEvent = async (req, res) => {
 exports.deleteEvent = async (req, res) => {
   try {
     const { id } = req.params;
-    const event = await Event.findByIdAndDelete(id);
 
+    const event = await Event.findByIdAndDelete(id);
     if (!event) {
       return res.status(404).json({
         success: false,
@@ -134,10 +183,32 @@ exports.deleteEvent = async (req, res) => {
       message: "Event deleted successfully",
     });
   } catch (err) {
-    console.log(err);
+    console.error(err);
     res.status(500).json({
       message: "Error occurred while deleting event",
       success: false,
+    });
+  }
+};
+
+// Fetch registrations for an event
+exports.getEventRegistrations = async (req, res) => {
+  try {
+    const { eventId } = req.params;
+
+    const registrations = await EventRegistration.find({ eventId })
+      .sort({ createdAt: -1 });
+
+    res.status(200).json({
+      success: true,
+      count: registrations.length,
+      registrations,
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch registrations",
     });
   }
 };

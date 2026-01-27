@@ -6,6 +6,8 @@
     fetchEvent,
     updateEvent,
     deleteEvent,
+    getEventRegistrations,
+     
   } = require("../../controllers/admin/AdminEventController");
 
   const router = express.Router();
@@ -16,5 +18,7 @@
   router.get("/get", fetchEvent);
   router.put("/update/:id", updateEvent);
   router.delete("/delete/:id", deleteEvent);
+
+  router.get("/get/registration",getEventRegistrations )
 
   module.exports = router;

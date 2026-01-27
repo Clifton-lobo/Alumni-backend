@@ -6,36 +6,62 @@ const EventSchema = new mongoose.Schema(
       type: String,
       required: false,
     },
+
     title: {
       type: String,
       required: true,
       trim: true,
     },
+
     date: {
       type: Date,
       required: true,
     },
+
     time: {
       type: String,
       required: true,
     },
+
     description: {
       type: String,
       required: true,
       trim: true,
     },
+
     category: {
       type: String,
       required: true,
     },
+
     status: {
       type: String,
-      required: true,
       enum: ["Upcoming", "Ongoing", "Completed", "Cancelled"],
       default: "Upcoming",
     },
+
+    // ✅ NEW: virtual or physical event
+    isVirtual: {
+      type: Boolean,
+      default: false,
+    },
+
+    // ✅ NEW: address (required only if NOT virtual)
+    address: {
+      type: String,
+      trim: true,
+      required: function () {
+        return !this.isVirtual;
+      },
+    },
+
+    registrationsCount: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
   },
-  { timestamps: true } // ✅ enables createdAt and updatedAt fields
+  { timestamps: true }
 );
 
 const Event = mongoose.model("Event", EventSchema);

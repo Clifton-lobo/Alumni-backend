@@ -1,5 +1,6 @@
+const EventRegistration = require("../../models/RegisterEvent.js");
 const Event = require("../../models/Event.model.js");
-
+// const sendEventConfirmationMail = require("../../helpers/SendMail.js");
 
 const getFilteredEvents = async (req, res) => {
   try {
@@ -9,19 +10,17 @@ const getFilteredEvents = async (req, res) => {
 
     let page = parseInt(req.query.page) || 1;
     let limit = parseInt(req.query.limit) || 15;
-    let skip = (page-1) * limit;
+    let skip = (page - 1) * limit;
 
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
     let query = {};
 
-    // 🔍 Search by title (case-insensitive)
     if (search && search.trim() !== "") {
       query.title = { $regex: search, $options: "i" };
     }
 
-    // 📅 Apply date filters ONLY when required
     const dateQuery = {};
 
     if (filter === "next7") {
@@ -50,31 +49,26 @@ const getFilteredEvents = async (req, res) => {
       dateQuery.$lte = new Date(endDate);
     }
 
-    // ➕ If date filter exists, merge into main query
     if (Object.keys(dateQuery).length > 0) {
       query.date = dateQuery;
     }
 
     const totalEvents = await Event.countDocuments(query);
 
-    console.log("🔍 Final Query =>", query);
-
     const events = await Event.find(query)
-    .sort({ date: 1 })
-    .skip(skip)
-    .limit(limit);
-
-    console.log("Found events:", events.length);
+      .sort({ date: 1 })
+      .skip(skip)
+      .limit(limit);
 
     return res.status(200).json({
       success: true,
       events,
-      currentPage : page,
-      totalPages : Math.ceil(totalEvents/limit),
+      currentPage: page,
+      totalPages: Math.ceil(totalEvents / limit),
       totalEvents,
     });
   } catch (err) {
-    console.log("❌ Error:", err);
+    console.error("❌ Error:", err);
     res.status(500).json({
       success: false,
       message: "Failed to fetch events",
@@ -85,12 +79,12 @@ const getFilteredEvents = async (req, res) => {
 const getEventDetails = async (req, res) => {
   try {
     const { id } = req.params;
-    const event = await Event.findById(id);
 
+    const event = await Event.findById(id);
     if (!event) {
       return res.status(404).json({
-        message: "Event not found",
         success: false,
+        message: "Event not found",
       });
     }
 
@@ -99,7 +93,7 @@ const getEventDetails = async (req, res) => {
       data: event,
     });
   } catch (err) {
-    console.log(err);
+    console.error(err);
     res.status(500).json({
       success: false,
       message: "Internal server error",
@@ -107,4 +101,78 @@ const getEventDetails = async (req, res) => {
   }
 };
 
-module.exports = { getEventDetails, getFilteredEvents };
+const registerForEvent = async (req, res) => {
+  try {
+
+    console.log("📝 Registration request:", { eventId: req.params.eventId, body: req.body });
+
+    const { eventId } = req.params;
+    const { name, email } = req.body;
+
+    if (!eventId || !email) {
+      return res.status(400).json({
+        message: "Event ID and email are required",
+      });
+    }
+
+    const event = await Event.findById(eventId);
+    if (!event) {
+      return res.status(404).json({
+        message: "Event not found",
+      });
+    }
+
+    if (new Date(event.date) < new Date()) {
+      return res.status(400).json({
+        message: "Cannot register for a past event",
+      });
+    }
+
+    const alreadyRegistered = await EventRegistration.findOne({
+      eventId,
+      email,
+    });
+
+    if (alreadyRegistered) {
+      return res.status(409).json({
+        message: "You are already registered for this event",
+      });
+    }
+
+    const registration = await EventRegistration.create({
+      eventId,
+      name,
+      email,
+      registeredAt: new Date(),
+    });
+
+    try {
+      await Event.findByIdAndUpdate(
+        eventId,
+        { $inc: { registrationsCount: 1 } }
+      );
+    } catch {
+      await EventRegistration.findByIdAndDelete(registration._id);
+      throw new Error("Failed to update registration count");
+    }
+
+    return res.status(201).json({
+      success: true,
+      message: "Registered successfully",
+      registrationId: registration._id,
+    });
+  } catch (error) {
+    console.error("Event registration failed:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error",
+    });
+  }
+};
+
+
+module.exports = {
+  getFilteredEvents,
+  getEventDetails,
+  registerForEvent,
+};
