@@ -4,12 +4,18 @@ const Event = require("../../models/Event.model.js");
 
 const getFilteredEvents = async (req, res) => {
   try {
-    console.log("📥 Filter request received:", req.query);
-
-    const { filter, startDate, endDate, search } = req.query;
+    const {
+      filter,
+      startDate,
+      endDate,
+      search,
+      category,
+      isVirtual,
+      status,
+    } = req.query;
 
     let page = parseInt(req.query.page) || 1;
-    let limit = parseInt(req.query.limit) || 15;
+    let limit = parseInt(req.query.limit) || 10;
     let skip = (page - 1) * limit;
 
     const today = new Date();
@@ -17,10 +23,30 @@ const getFilteredEvents = async (req, res) => {
 
     let query = {};
 
-    if (search && search.trim() !== "") {
+    /* ---------- SEARCH ---------- */
+    if (search?.trim()) {
       query.title = { $regex: search, $options: "i" };
     }
 
+    /* ---------- CATEGORY ---------- */
+    if (category && category !== "all") {
+query.category = new RegExp(`^${category}$`, "i");
+    }
+
+    /* ---------- EVENT MODE ---------- */
+    if (isVirtual === "true") {
+      query.isVirtual = true;
+    }
+    if (isVirtual === "false") {
+      query.isVirtual = false;
+    }
+
+    /* ---------- STATUS ---------- */
+    if (status && status !== "all") {
+      query.status = status; // must match enum exactly
+    }
+
+    /* ---------- DATE FILTER ---------- */
     const dateQuery = {};
 
     if (filter === "next7") {
@@ -49,10 +75,11 @@ const getFilteredEvents = async (req, res) => {
       dateQuery.$lte = new Date(endDate);
     }
 
-    if (Object.keys(dateQuery).length > 0) {
+    if (Object.keys(dateQuery).length) {
       query.date = dateQuery;
     }
 
+    /* ---------- QUERY DB ---------- */
     const totalEvents = await Event.countDocuments(query);
 
     const events = await Event.find(query)
@@ -60,7 +87,7 @@ const getFilteredEvents = async (req, res) => {
       .skip(skip)
       .limit(limit);
 
-    return res.status(200).json({
+    res.status(200).json({
       success: true,
       events,
       currentPage: page,
@@ -68,13 +95,14 @@ const getFilteredEvents = async (req, res) => {
       totalEvents,
     });
   } catch (err) {
-    console.error("❌ Error:", err);
+    console.error(err);
     res.status(500).json({
       success: false,
       message: "Failed to fetch events",
     });
   }
 };
+
 
 const getEventDetails = async (req, res) => {
   try {
@@ -135,7 +163,7 @@ const registerForEvent = async (req, res) => {
 
     if (alreadyRegistered) {
       return res.status(409).json({
-        message: "You are already registered for this event",
+        message: "You have already registered for this event",
       });
     }
 

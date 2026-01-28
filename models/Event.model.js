@@ -4,7 +4,6 @@ const EventSchema = new mongoose.Schema(
   {
     image: {
       type: String,
-      required: false,
     },
 
     title: {
@@ -39,19 +38,30 @@ const EventSchema = new mongoose.Schema(
       enum: ["Upcoming", "Ongoing", "Completed", "Cancelled"],
       default: "Upcoming",
     },
-
-    // ✅ NEW: virtual or physical event
+    
     isVirtual: {
       type: Boolean,
       default: false,
     },
 
-    // ✅ NEW: address (required only if NOT virtual)
     address: {
       type: String,
       trim: true,
       required: function () {
         return !this.isVirtual;
+      },
+    },
+
+    isLimited: {
+      type: Boolean,
+      default: false,
+    },
+
+    capacity: {
+      type: Number,
+      min: 1,
+      required: function () {
+        return this.isLimited;
       },
     },
 
@@ -64,6 +74,17 @@ const EventSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-const Event = mongoose.model("Event", EventSchema);
+/* ===============================
+   SAFETY VALIDATION
+=============================== */
+EventSchema.pre("save", function (next) {
+  if (this.isLimited && this.registrationsCount > this.capacity) {
+    return next(
+      new Error("Registrations exceed event capacity")
+    );
+  }
+  next();
+});
 
+const Event = mongoose.model("Event", EventSchema);
 module.exports = Event;

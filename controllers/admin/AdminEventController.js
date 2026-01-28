@@ -2,13 +2,16 @@ const { handleImageUploadUtil } = require("../../helpers/Cloudinary");
 const Event = require("../../models/Event.model");
 const EventRegistration = require("../../models/RegisterEvent");
 
-// Upload image to Cloudinary
+/* ===============================
+   IMAGE UPLOAD
+=============================== */
 exports.handleImageUpload = async (req, res) => {
   try {
     if (!req.file) {
-      return res
-        .status(400)
-        .json({ success: false, message: "No file uploaded" });
+      return res.status(400).json({
+        success: false,
+        message: "No file uploaded",
+      });
     }
 
     const result = await handleImageUploadUtil(
@@ -30,7 +33,9 @@ exports.handleImageUpload = async (req, res) => {
   }
 };
 
-// ✅ Add a new event (UPDATED)
+/* ===============================
+   ADD EVENT (WITH LIMIT SUPPORT)
+=============================== */
 exports.addEvent = async (req, res) => {
   try {
     const {
@@ -43,9 +48,11 @@ exports.addEvent = async (req, res) => {
       description,
       isVirtual,
       address,
+      isLimited,
+      capacity,
     } = req.body;
 
-    // 🔒 Validation
+    // 🔒 Basic validation
     if (!title || !date || !time || !category || !description) {
       return res.status(400).json({
         success: false,
@@ -53,11 +60,22 @@ exports.addEvent = async (req, res) => {
       });
     }
 
+    // 🔒 Address validation
     if (isVirtual === false && !address) {
       return res.status(400).json({
         success: false,
         message: "Address is required for physical events",
       });
+    }
+
+    // 🔒 Capacity validation
+    if (isLimited === true) {
+      if (!capacity || capacity < 1) {
+        return res.status(400).json({
+          success: false,
+          message: "Capacity must be at least 1 for limited events",
+        });
+      }
     }
 
     const newEvent = new Event({
@@ -70,6 +88,8 @@ exports.addEvent = async (req, res) => {
       description,
       isVirtual,
       address: isVirtual ? undefined : address,
+      isLimited: isLimited ?? false,
+      capacity: isLimited ? capacity : undefined,
     });
 
     await newEvent.save();
@@ -81,13 +101,15 @@ exports.addEvent = async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({
-      message: "Error occurred while adding event",
       success: false,
+      message: "Error occurred while adding event",
     });
   }
 };
 
-// Fetch all events
+/* ===============================
+   FETCH EVENTS
+=============================== */
 exports.fetchEvent = async (req, res) => {
   try {
     const listOfEvents = await Event.find({}).sort({ date: 1 });
@@ -99,16 +121,19 @@ exports.fetchEvent = async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({
-      message: "Error occurred while fetching events",
       success: false,
+      message: "Error occurred while fetching events",
     });
   }
 };
 
-// ✅ Update event (UPDATED)
+/* ===============================
+   UPDATE EVENT (WITH LIMIT SUPPORT)
+=============================== */
 exports.updateEvent = async (req, res) => {
   try {
     const { id } = req.params;
+
     const {
       image,
       title,
@@ -119,6 +144,8 @@ exports.updateEvent = async (req, res) => {
       description,
       isVirtual,
       address,
+      isLimited,
+      capacity,
     } = req.body;
 
     const event = await Event.findById(id);
@@ -129,7 +156,7 @@ exports.updateEvent = async (req, res) => {
       });
     }
 
-    // 🔒 Conditional validation
+    // 🔒 Address validation
     if (isVirtual === false && !address) {
       return res.status(400).json({
         success: false,
@@ -137,6 +164,26 @@ exports.updateEvent = async (req, res) => {
       });
     }
 
+    // 🔒 Capacity validation
+    if (isLimited === true) {
+      if (!capacity || capacity < 1) {
+        return res.status(400).json({
+          success: false,
+          message: "Capacity must be at least 1 for limited events",
+        });
+      }
+
+      // prevent shrinking below current registrations
+      if (event.registrationsCount > capacity) {
+        return res.status(400).json({
+          success: false,
+          message:
+            "Capacity cannot be less than current registrations",
+        });
+      }
+    }
+
+    // 🔄 Field updates
     event.image = image ?? event.image;
     event.title = title ?? event.title;
     event.date = date ?? event.date;
@@ -150,6 +197,11 @@ exports.updateEvent = async (req, res) => {
       event.address = isVirtual ? undefined : address;
     }
 
+    if (typeof isLimited === "boolean") {
+      event.isLimited = isLimited;
+      event.capacity = isLimited ? capacity : undefined;
+    }
+
     await event.save();
 
     res.status(200).json({
@@ -159,13 +211,15 @@ exports.updateEvent = async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({
-      message: "Error occurred while updating event",
       success: false,
+      message: "Error occurred while updating event",
     });
   }
 };
 
-// Delete event
+/* ===============================
+   DELETE EVENT
+=============================== */
 exports.deleteEvent = async (req, res) => {
   try {
     const { id } = req.params;
@@ -185,13 +239,15 @@ exports.deleteEvent = async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({
-      message: "Error occurred while deleting event",
       success: false,
+      message: "Error occurred while deleting event",
     });
   }
 };
 
-// Fetch registrations for an event
+/* ===============================
+   FETCH EVENT REGISTRATIONS
+=============================== */
 exports.getEventRegistrations = async (req, res) => {
   try {
     const { eventId } = req.params;
